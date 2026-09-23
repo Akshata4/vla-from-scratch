@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+*.pt
+*.gif
+input_image.png

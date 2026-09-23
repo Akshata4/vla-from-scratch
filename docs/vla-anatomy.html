@@ -1,0 +1,475 @@
+<title>VLA Anatomy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f2f3f6;
+    --surface:#ffffff;
+    --surface-2:#e7e9ee;
+    --ink:#1b2430;
+    --muted:#5b6572;
+    --line:#d7dbe1;
+    --vision:#2f6fed;
+    --vision-fill:#e7f0ff;
+    --action:#b85a0e;
+    --action-fill:#fbe9dc;
+    --core-line:#8b93a1;
+    --font-sans:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171c;
+      --surface:#1b2028;
+      --surface-2:#242b35;
+      --ink:#e8eaee;
+      --muted:#9aa3b0;
+      --line:#2c323c;
+      --vision:#7aa8ff;
+      --vision-fill:#1c2942;
+      --action:#ffab5e;
+      --action-fill:#3a2712;
+      --core-line:#aab3c0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14171c;
+    --surface:#1b2028;
+    --surface-2:#242b35;
+    --ink:#e8eaee;
+    --muted:#9aa3b0;
+    --line:#2c323c;
+    --vision:#7aa8ff;
+    --vision-fill:#1c2942;
+    --action:#ffab5e;
+    --action-fill:#3a2712;
+    --core-line:#aab3c0;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    margin:0;
+    padding-inline:16px;
+    padding-block:36px 56px;
+    line-height:1.5;
+  }
+  .page{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+  h1{font-size:clamp(26px,4vw,36px);margin:0 0 6px;letter-spacing:-0.01em;text-wrap:balance}
+  .kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+  .lead{color:var(--muted);max-width:70ch;font-size:15px;margin:0}
+  .legend{display:flex;flex-wrap:wrap;gap:18px;font-size:12.5px;color:var(--muted);align-items:center;padding-top:4px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+  section{display:flex;flex-direction:column;gap:14px}
+  h2{font-size:19px;margin:0;letter-spacing:-0.005em}
+  .figure-scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+  figure{margin:0}
+  svg{display:block}
+  figcaption{font-size:13px;color:var(--muted);max-width:75ch;margin-top:10px}
+  .note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-size:14px;color:var(--ink)}
+  .note b{color:var(--action)}
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;min-width:680px;font-size:13.5px}
+  th,td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  thead th{font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+  tbody th{font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+  tr:last-child td, tr:last-child th{border-bottom:none}
+  td code, th code{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+  footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px}
+  footer code{font-family:var(--font-mono)}
+</style>
+
+<div class="page">
+
+  <div>
+    <p class="kicker">Vision-Language-Action, mapped against an ordinary LLM</p>
+    <h1>Everything a VLA bolts onto a transformer</h1>
+    <p class="lead">Same self-attention block throughout. What changes between an LLM, a VLM and a VLA is only what gets spliced into the input sequence and what gets spliced into the output vocabulary — plus, for a VLA, a loop back out into the world.</p>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--core-line)"></i>shared / unchanged</span>
+      <span><i class="swatch" style="background:var(--vision)"></i>added by VLM</span>
+      <span><i class="swatch" style="background:var(--action)"></i>added by VLA</span>
+    </div>
+  </div>
+
+  <section>
+    <h2>Figure 1 — the same core, two things spliced in</h2>
+    <div class="figure-scroll">
+      <figure>
+        <svg viewBox="0 0 1300 760" width="1300" height="760" role="img"
+             aria-label="Three stacked pipelines for LLM, VLM and VLA. All three share the same transformer core. The VLM row adds an image input path in blue that gets concatenated with text tokens. The VLA row keeps that vision path and additionally colors the output head, action token and a new environment box in amber, with a dashed loop carrying the executed action's resulting observation back to the image input.">
+          <defs>
+            <marker id="f1-arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--muted)"/>
+            </marker>
+            <marker id="f1-arrow-vision" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--vision)"/>
+            </marker>
+            <marker id="f1-arrow-action" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--action)"/>
+            </marker>
+          </defs>
+
+          <!-- row labels -->
+          <text x="16" y="120" style="fill:var(--ink);font-family:var(--font-sans);font-size:17px;font-weight:700">LLM</text>
+          <text x="16" y="330" style="fill:var(--ink);font-family:var(--font-sans);font-size:17px;font-weight:700">VLM</text>
+          <text x="16" y="540" style="fill:var(--ink);font-family:var(--font-sans);font-size:17px;font-weight:700">VLA</text>
+
+          <!-- ================= ROW 1: LLM ================= -->
+          <rect x="90" y="90" width="110" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="145" y="119" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Text</text>
+
+          <line x1="200" y1="115" x2="238" y2="115" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="240" y="90" width="170" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="325" y="112" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Tokenizer</text>
+          <text x="325" y="127" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">+ embed</text>
+
+          <line x1="410" y1="115" x2="478" y2="115" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="480" y="70" width="210" height="90" rx="10" style="fill:var(--surface);stroke:var(--core-line);stroke-width:2"/>
+          <text x="585" y="105" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Transformer</text>
+          <text x="585" y="121" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">causal self-attn</text>
+          <text x="585" y="136" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">+ MLP &#215; N</text>
+
+          <line x1="690" y1="115" x2="728" y2="115" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="730" y="90" width="150" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="805" y="119" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">LM head</text>
+
+          <line x1="880" y1="115" x2="918" y2="115" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="920" y="90" width="140" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="990" y="112" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">next text</text>
+          <text x="990" y="127" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">token</text>
+
+          <!-- delta 1 -->
+          <text x="90" y="196" style="fill:var(--vision);font-family:var(--font-sans);font-size:12.5px;font-weight:600">+ vision encoder &amp; projector splice image</text>
+          <text x="90" y="212" style="fill:var(--vision);font-family:var(--font-sans);font-size:12.5px;font-weight:600">patches into the input sequence</text>
+          <line x1="145" y1="222" x2="145" y2="260" style="stroke:var(--vision);stroke-width:1.5" marker-end="url(#f1-arrow-vision)"/>
+
+          <!-- ================= ROW 2: VLM ================= -->
+          <rect x="90" y="265" width="110" height="50" rx="10" style="fill:var(--vision-fill);stroke:var(--vision);stroke-width:1.5"/>
+          <text x="145" y="294" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Image</text>
+
+          <line x1="200" y1="290" x2="238" y2="290" style="stroke:var(--vision);stroke-width:1.5" marker-end="url(#f1-arrow-vision)"/>
+
+          <rect x="240" y="265" width="170" height="50" rx="10" style="fill:var(--vision-fill);stroke:var(--vision);stroke-width:1.5"/>
+          <text x="325" y="287" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Vision encoder</text>
+          <text x="325" y="302" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">+ projector</text>
+
+          <rect x="90" y="335" width="110" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="145" y="364" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Instruction</text>
+
+          <line x1="200" y1="360" x2="238" y2="360" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="240" y="335" width="170" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="325" y="357" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Tokenizer</text>
+          <text x="325" y="372" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">+ embed</text>
+
+          <text x="416" y="278" style="fill:var(--vision);font-family:var(--font-mono);font-size:10.5px">visual tokens</text>
+          <line x1="410" y1="290" x2="455" y2="325" style="stroke:var(--vision);stroke-width:1.5"/>
+          <text x="416" y="388" style="fill:var(--muted);font-family:var(--font-mono);font-size:10.5px">text tokens</text>
+          <line x1="410" y1="360" x2="455" y2="325" style="stroke:var(--muted);stroke-width:1.5"/>
+          <line x1="458" y1="325" x2="478" y2="325" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="480" y="280" width="210" height="90" rx="10" style="fill:var(--surface);stroke:var(--core-line);stroke-width:2"/>
+          <text x="585" y="315" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Transformer</text>
+          <text x="585" y="331" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">causal self-attn</text>
+          <text x="585" y="346" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">+ MLP &#215; N</text>
+
+          <line x1="690" y1="325" x2="728" y2="325" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="730" y="300" width="150" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="805" y="329" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">LM head</text>
+
+          <line x1="880" y1="325" x2="918" y2="325" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="920" y="300" width="140" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="990" y="322" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">next text</text>
+          <text x="990" y="337" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">token</text>
+
+          <!-- delta 2 -->
+          <text x="730" y="406" style="fill:var(--action);font-family:var(--font-sans);font-size:12.5px;font-weight:600">+ action tokens appended to the vocabulary;</text>
+          <text x="730" y="422" style="fill:var(--action);font-family:var(--font-sans);font-size:12.5px;font-weight:600">executed action becomes the next observation</text>
+          <line x1="805" y1="432" x2="805" y2="470" style="stroke:var(--action);stroke-width:1.5" marker-end="url(#f1-arrow-action)"/>
+
+          <!-- ================= ROW 3: VLA ================= -->
+          <rect x="90" y="475" width="110" height="50" rx="10" style="fill:var(--vision-fill);stroke:var(--vision);stroke-width:1.5"/>
+          <text x="145" y="504" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Image</text>
+
+          <line x1="200" y1="500" x2="238" y2="500" style="stroke:var(--vision);stroke-width:1.5" marker-end="url(#f1-arrow-vision)"/>
+
+          <rect x="240" y="475" width="170" height="50" rx="10" style="fill:var(--vision-fill);stroke:var(--vision);stroke-width:1.5"/>
+          <text x="325" y="497" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Vision encoder</text>
+          <text x="325" y="512" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">+ projector</text>
+
+          <rect x="90" y="545" width="110" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="145" y="574" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Instruction</text>
+
+          <line x1="200" y1="570" x2="238" y2="570" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="240" y="545" width="170" height="50" rx="10" style="fill:var(--surface);stroke:var(--line);stroke-width:1.5"/>
+          <text x="325" y="567" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Tokenizer</text>
+          <text x="325" y="582" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">+ embed</text>
+
+          <text x="416" y="488" style="fill:var(--vision);font-family:var(--font-mono);font-size:10.5px">visual tokens</text>
+          <line x1="410" y1="500" x2="455" y2="535" style="stroke:var(--vision);stroke-width:1.5"/>
+          <text x="416" y="598" style="fill:var(--muted);font-family:var(--font-mono);font-size:10.5px">text tokens</text>
+          <line x1="410" y1="570" x2="455" y2="535" style="stroke:var(--muted);stroke-width:1.5"/>
+          <line x1="458" y1="535" x2="478" y2="535" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="480" y="490" width="210" height="90" rx="10" style="fill:var(--surface);stroke:var(--core-line);stroke-width:2"/>
+          <text x="585" y="525" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">Transformer</text>
+          <text x="585" y="541" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">causal self-attn</text>
+          <text x="585" y="556" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">+ MLP &#215; N</text>
+
+          <line x1="690" y1="535" x2="728" y2="535" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f1-arrow-muted)"/>
+
+          <rect x="730" y="510" width="150" height="50" rx="10" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <text x="805" y="533" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">LM head</text>
+          <text x="805" y="548" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:11px;font-weight:600">(+ action ids)</text>
+
+          <line x1="880" y1="535" x2="918" y2="535" style="stroke:var(--action);stroke-width:1.5" marker-end="url(#f1-arrow-action)"/>
+
+          <rect x="920" y="510" width="140" height="50" rx="10" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <text x="990" y="532" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">action</text>
+          <text x="990" y="547" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">token</text>
+
+          <line x1="1060" y1="535" x2="1098" y2="535" style="stroke:var(--action);stroke-width:1.5" marker-end="url(#f1-arrow-action)"/>
+
+          <rect x="1100" y="510" width="150" height="50" rx="10" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <text x="1175" y="532" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">execute in</text>
+          <text x="1175" y="547" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">environment</text>
+
+          <text x="805" y="470" text-anchor="middle" style="fill:var(--action);font-family:var(--font-mono);font-size:10.5px">&lt;UP&gt; &lt;DOWN&gt; &lt;LEFT&gt; &lt;RIGHT&gt;</text>
+
+          <!-- feedback loop -->
+          <path d="M 1120,560 C 1120,660 145,660 145,527" fill="none" style="stroke:var(--action);stroke-width:1.5;stroke-dasharray:5 4" marker-end="url(#f1-arrow-action)"/>
+          <text x="632" y="676" text-anchor="middle" style="fill:var(--action);font-family:var(--font-mono);font-size:11px">new observation (closed-loop control)</text>
+        </svg>
+      </figure>
+      <figcaption>Text and the transformer core (gray) never change. The VLM row adds a parallel vision path (blue) that gets concatenated with text tokens before the same transformer. The VLA row keeps that path and additionally extends the output vocabulary with action tokens (amber), constrains decoding to that subset, and physically executes the result — the resulting observation re-enters as the next image.</figcaption>
+    </div>
+  </section>
+
+  <section>
+    <h2>Figure 2 — inside the VLA's single forward pass</h2>
+    <div class="figure-scroll">
+      <figure>
+        <svg viewBox="0 0 900 660" width="900" height="660" role="img"
+             aria-label="A token sequence of 16 visual tokens, 4 instruction tokens and one query token BOA flows into a causal transformer. An inset shows the causal attention mask as a triangular grid where the last row, corresponding to BOA, is highlighted and fully filled, meaning it attends to every earlier token. The transformer output goes through a weight-tied language modeling head producing a bar chart of logits over the full vocabulary. Nine bars for language tokens are neutral; four bars for the action tokens are amber, and the tallest amber bar, DOWN, is circled as the argmax result, which becomes the chosen action.">
+          <defs>
+            <marker id="f2-arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--muted)"/>
+            </marker>
+            <marker id="f2-arrow-vision" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--vision)"/>
+            </marker>
+            <marker id="f2-arrow-action" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--action)"/>
+            </marker>
+          </defs>
+
+          <!-- token sequence strip -->
+          <g style="font-family:var(--font-mono);font-size:9.5px">
+            <rect x="40" y="30" width="34" height="34" rx="6" style="fill:var(--vision-fill);stroke:var(--vision)"/>
+            <text x="57" y="51" text-anchor="middle" style="fill:var(--ink)">v1</text>
+            <rect x="80" y="30" width="34" height="34" rx="6" style="fill:var(--vision-fill);stroke:var(--vision)"/>
+            <text x="97" y="51" text-anchor="middle" style="fill:var(--ink)">v2</text>
+            <rect x="120" y="30" width="34" height="34" rx="6" style="fill:var(--vision-fill);stroke:var(--vision)"/>
+            <text x="137" y="51" text-anchor="middle" style="fill:var(--ink)">v3</text>
+            <rect x="160" y="30" width="34" height="34" rx="6" style="fill:var(--vision-fill);stroke:var(--vision)"/>
+            <text x="177" y="51" text-anchor="middle" style="fill:var(--ink)">&#8943;</text>
+            <rect x="200" y="30" width="34" height="34" rx="6" style="fill:var(--vision-fill);stroke:var(--vision)"/>
+            <text x="217" y="51" text-anchor="middle" style="fill:var(--ink)">v16</text>
+
+            <rect x="264" y="30" width="34" height="34" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <text x="281" y="51" text-anchor="middle" style="fill:var(--ink)">t1</text>
+            <rect x="304" y="30" width="34" height="34" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <text x="321" y="51" text-anchor="middle" style="fill:var(--ink)">t2</text>
+            <rect x="344" y="30" width="34" height="34" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <text x="361" y="51" text-anchor="middle" style="fill:var(--ink)">t3</text>
+            <rect x="384" y="30" width="34" height="34" rx="6" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <text x="401" y="51" text-anchor="middle" style="fill:var(--ink)">t4</text>
+
+            <rect x="448" y="30" width="34" height="34" rx="6" style="fill:var(--action-fill);stroke:var(--action)"/>
+            <text x="465" y="51" text-anchor="middle" style="fill:var(--ink)">BOA</text>
+          </g>
+
+          <text x="137" y="76" text-anchor="middle" style="fill:var(--vision);font-family:var(--font-sans);font-size:11px;font-weight:600">visual tokens (16)</text>
+          <text x="341" y="76" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-sans);font-size:11px;font-weight:600">instruction tokens (4)</text>
+          <text x="465" y="76" text-anchor="middle" style="fill:var(--action);font-family:var(--font-sans);font-size:11px;font-weight:600">query</text>
+
+          <line x1="137" y1="86" x2="137" y2="138" style="stroke:var(--vision);stroke-width:1.5" marker-end="url(#f2-arrow-vision)"/>
+          <line x1="341" y1="86" x2="341" y2="138" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#f2-arrow-muted)"/>
+          <line x1="465" y1="86" x2="465" y2="138" style="stroke:var(--action);stroke-width:1.5" marker-end="url(#f2-arrow-action)"/>
+
+          <!-- transformer -->
+          <rect x="40" y="140" width="460" height="66" rx="10" style="fill:var(--surface);stroke:var(--core-line);stroke-width:2"/>
+          <text x="270" y="168" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12.5px;font-weight:600">Transformer: 3&#215; (causal self-attention + MLP)</text>
+          <text x="270" y="187" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:11px">shared weights — identical to the LLM/VLM core</text>
+
+          <!-- causal mask inset -->
+          <text x="622" y="128" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12px;font-weight:600">causal attention mask</text>
+          <g transform="translate(560,138)">
+            <!-- 7x7 grid, cell 16x16 gap 2 -->
+            <!-- row 0 -->
+            <rect x="0" y="0" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="36" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="54" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="72" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="90" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="108" y="0" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 1 -->
+            <rect x="0" y="18" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="18" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="36" y="18" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="54" y="18" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="72" y="18" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="90" y="18" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="108" y="18" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 2 -->
+            <rect x="0" y="36" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="36" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="36" y="36" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="54" y="36" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="72" y="36" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="90" y="36" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="108" y="36" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 3 -->
+            <rect x="0" y="54" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="54" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="36" y="54" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="54" y="54" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="72" y="54" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="90" y="54" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="108" y="54" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 4 -->
+            <rect x="0" y="72" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="72" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="36" y="72" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="54" y="72" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="72" y="72" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="90" y="72" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <rect x="108" y="72" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 5 -->
+            <rect x="0" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="18" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="36" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="54" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="72" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="90" y="90" width="16" height="16" style="fill:var(--surface-2);stroke:var(--line)"/>
+            <rect x="108" y="90" width="16" height="16" style="fill:none;stroke:var(--line)"/>
+            <!-- row 6 = BOA, attends to everything -->
+            <rect x="0" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="18" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="36" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="54" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="72" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="90" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+            <rect x="108" y="108" width="16" height="16" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          </g>
+          <text x="622" y="284" text-anchor="middle" style="fill:var(--action);font-family:var(--font-sans);font-size:10.5px;font-weight:600">last row = BOA: sees every prior token</text>
+
+          <!-- LM head -->
+          <line x1="270" y1="206" x2="270" y2="248" style="stroke:var(--core-line);stroke-width:1.5" marker-end="url(#f2-arrow-muted)"/>
+          <rect x="140" y="250" width="260" height="54" rx="10" style="fill:var(--surface);stroke:var(--core-line);stroke-width:2"/>
+          <text x="270" y="273" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-sans);font-size:12.5px;font-weight:600">LM head</text>
+          <text x="270" y="289" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-mono);font-size:10.5px">weight-tied to input embedding</text>
+
+          <line x1="270" y1="304" x2="270" y2="340" style="stroke:var(--core-line);stroke-width:1.5" marker-end="url(#f2-arrow-muted)"/>
+
+          <!-- vocab logit bars, baseline y=540 -->
+          <text x="270" y="332" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-sans);font-size:11px">logits over the full vocabulary</text>
+          <line x1="79" y1="540" x2="461" y2="540" style="stroke:var(--line);stroke-width:1"/>
+
+          <rect x="79"  y="510" width="22" height="30" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="109" y="515" width="22" height="25" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="139" y="500" width="22" height="40" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="169" y="505" width="22" height="35" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="199" y="495" width="22" height="45" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="229" y="490" width="22" height="50" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="259" y="502" width="22" height="38" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="289" y="498" width="22" height="42" style="fill:var(--surface-2);stroke:var(--line)"/>
+          <rect x="319" y="485" width="22" height="55" style="fill:var(--surface-2);stroke:var(--line)"/>
+
+          <rect x="349" y="480" width="22" height="60" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <rect x="379" y="445" width="22" height="95" style="fill:var(--action-fill);stroke:var(--action);stroke-width:2"/>
+          <rect x="409" y="490" width="22" height="50" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <rect x="439" y="500" width="22" height="40" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+
+          <circle cx="390" cy="445" r="9" style="fill:none;stroke:var(--action);stroke-width:2"/>
+          <text x="390" y="432" text-anchor="middle" style="fill:var(--action);font-family:var(--font-mono);font-size:10px;font-weight:600">argmax</text>
+
+          <text x="259" y="556" text-anchor="middle" style="fill:var(--muted);font-family:var(--font-sans);font-size:11px">9 language tokens</text>
+          <text x="405" y="556" text-anchor="middle" style="fill:var(--action);font-family:var(--font-sans);font-size:11px;font-weight:600">4 action tokens</text>
+          <text x="405" y="571" text-anchor="middle" style="fill:var(--action);font-family:var(--font-mono);font-size:10px">&lt;UP&gt; &lt;DOWN&gt; &lt;LEFT&gt; &lt;RIGHT&gt;</text>
+
+          <line x1="390" y1="580" x2="390" y2="602" style="stroke:var(--action);stroke-width:1.5" marker-end="url(#f2-arrow-action)"/>
+          <rect x="255" y="605" width="270" height="40" rx="8" style="fill:var(--action-fill);stroke:var(--action);stroke-width:1.5"/>
+          <text x="390" y="630" text-anchor="middle" style="fill:var(--ink);font-family:var(--font-mono);font-size:12px;font-weight:600">chosen: &lt;DOWN&gt;  &#8594;  env.step("down")</text>
+        </svg>
+      </figure>
+      <figcaption>The exact sequence <code>model.py</code> builds: 16 visual tokens + 4 instruction tokens + one <code>&lt;BOA&gt;</code> query token, run through a causal transformer so <code>&lt;BOA&gt;</code> (bottom row of the mask) can see everything before it. The output head is weight-tied to the input embedding and scores the whole vocabulary — training only ever supervises the 4 action-token logits at this position, and inference does constrained decoding by taking the argmax restricted to those 4.</figcaption>
+    </div>
+  </section>
+
+  <section>
+    <h2>Same ingredients, three recipes</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th></th><th>LLM</th><th>VLM</th><th>VLA</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Input tokens</th>
+            <td>text only</td>
+            <td>text + image patches (projected)</td>
+            <td>text + image patches (projected)</td>
+          </tr>
+          <tr>
+            <th scope="row">Vocabulary</th>
+            <td>language tokens</td>
+            <td>language tokens</td>
+            <td>language tokens <b>+ action tokens</b></td>
+          </tr>
+          <tr>
+            <th scope="row">Output head</th>
+            <td>softmax over vocab</td>
+            <td>softmax over vocab</td>
+            <td>softmax over vocab, <b>decoding constrained to action ids</b></td>
+          </tr>
+          <tr>
+            <th scope="row">Training loss</th>
+            <td>next-token cross-entropy</td>
+            <td>next-token cross-entropy (captions / VQA)</td>
+            <td>cross-entropy vs. the <b>expert's action token</b> (behavior cloning)</td>
+          </tr>
+          <tr>
+            <th scope="row">Control loop</th>
+            <td>none — batch generation</td>
+            <td>none — one question, one answer</td>
+            <td><b>closed loop:</b> action &#8594; <code>env.step()</code> &#8594; new image &#8594; repeat</td>
+          </tr>
+          <tr>
+            <th scope="row">In your <code>vla_scratch/</code></th>
+            <td>&#8212;</td>
+            <td><code>model.py</code>: VisionEncoder + projector</td>
+            <td>+ <code>tokenizer.py</code> action ids, + <code>env.py</code> render/step loop</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Reference: RT-2 and OpenVLA overload a real pretrained LLM's vocabulary this same way; your toy model does it explicitly with four hand-picked <code>&lt;UP&gt;/&lt;DOWN&gt;/&lt;LEFT&gt;/&lt;RIGHT&gt;</code> tokens so every step of the trick stays visible.
+  </footer>
+
+</div>
