@@ -4,3 +4,4 @@ __pycache__/
 *.pt
 *.gif
 input_image.png
+.DS_Store

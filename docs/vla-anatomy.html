@@ -80,6 +80,15 @@
   td code, th code{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px}
   footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px}
   footer code{font-family:var(--font-mono)}
+
+  @media print{
+    @page{size:1400px 1750px;margin:30px}
+    body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{max-width:none;gap:26px}
+    .figure-scroll{overflow:visible}
+    svg{width:100%;height:auto}
+    section,.note,.table-scroll{break-inside:avoid}
+  }
 </style>
 
 <div class="page">
