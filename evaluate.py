@@ -2,10 +2,10 @@ import numpy as np
 import torch
 from PIL import Image
 
-from .data import MAX_STEPS
-from .env import GridWorld
-from .tokenizer import ID_TO_ACTION_NAME, encode_instruction
-from .train import CHECKPOINT_PATH, build_model
+from data import MAX_STEPS
+from env import GridWorld
+from tokenizer import ID_TO_ACTION_NAME, encode_instruction
+from train import CHECKPOINT_PATH, build_model
 
 
 def load_model(checkpoint=CHECKPOINT_PATH, device="cpu"):

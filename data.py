@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 
-from .env import GridWorld
-from .tokenizer import encode_instruction, encode_action
+from env import GridWorld
+from tokenizer import encode_instruction, encode_action
 
 MAX_STEPS = 16  # >= worst-case Manhattan distance on an 8x8 grid (7 + 7)
 
