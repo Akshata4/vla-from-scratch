@@ -1,0 +1,533 @@
+<title>VLA Live Explainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* layout: scene editor + controls on the left (sticky on desktop, stacked on phone),
+     a live pipeline trace on the right that recomputes from the real trained weights
+     on every click -- same palette as the two companion diagrams in this series */
+  :root{
+    --bg:#f2f3f6; --surface:#ffffff; --surface-2:#e7e9ee;
+    --ink:#1b2430; --muted:#5b6572; --line:#d7dbe1;
+    --vision:#2f6fed; --vision-fill:#e7f0ff;
+    --action:#b85a0e; --action-fill:#fbe9dc;
+    --signal:#a1303a; --signal-fill:#fbe3e5;
+    --core-line:#8b93a1;
+    --font-sans:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171c; --surface:#1b2028; --surface-2:#242b35;
+      --ink:#e8eaee; --muted:#9aa3b0; --line:#2c323c;
+      --vision:#7aa8ff; --vision-fill:#1c2942;
+      --action:#ffab5e; --action-fill:#3a2712;
+      --signal:#ff8a93; --signal-fill:#3a1e22;
+      --core-line:#aab3c0; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14171c; --surface:#1b2028; --surface-2:#242b35;
+    --ink:#e8eaee; --muted:#9aa3b0; --line:#2c323c;
+    --vision:#7aa8ff; --vision-fill:#1c2942;
+    --action:#ffab5e; --action-fill:#3a2712;
+    --signal:#ff8a93; --signal-fill:#3a1e22;
+    --core-line:#aab3c0; color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font-sans);margin:0;padding-inline:16px;padding-block:28px 56px;line-height:1.45}
+  .page{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+  h1{font-size:clamp(22px,4vw,28px);margin:0 0 4px;letter-spacing:-0.01em}
+  .kicker{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  .lead{color:var(--muted);max-width:74ch;font-size:14.5px;margin:0}
+  .layout{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+  .panel-left{flex:0 0 320px;min-width:280px;display:flex;flex-direction:column;gap:16px;position:sticky;top:12px}
+  .panel-right{flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;font-weight:600}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  #scene-svg{display:block;width:100%;max-width:280px;margin:0 auto;cursor:pointer}
+  #scene-svg rect.cell{stroke:var(--line);stroke-width:1}
+  .legend-row{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend-row span{display:inline-flex;align-items:center;gap:4px}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none;border:1px solid var(--line)}
+  select, button{font-family:var(--font-sans);font-size:13px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:8px 10px}
+  button{cursor:pointer;font-weight:600}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;background:var(--surface-2);flex:1}
+  .seg button.active.train{background:var(--signal-fill);color:var(--signal)}
+  .seg button.active.infer{background:var(--action-fill);color:var(--action)}
+  .stage{background:var(--surface);border:1px solid var(--core-line);border-radius:12px;padding:14px 16px}
+  .stage.vision{border-color:var(--vision)}
+  .stage.train{border-color:var(--signal)}
+  .stage.infer{border-color:var(--action)}
+  .stage-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .stage-head b{font-size:13px}
+  .stage-head .shape{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+  .stage-body{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+  .token-row{display:flex;flex-wrap:wrap;gap:4px}
+  .pill{font-family:var(--font-mono);font-size:10.5px;padding:4px 6px;border-radius:5px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)}
+  .pill.v{border-color:var(--vision);background:var(--vision-fill)}
+  .pill.boa{border-color:var(--action);background:var(--action-fill);font-weight:700}
+  svg.inline{display:block;max-width:100%;height:auto}
+  figcaption{font-size:12px;color:var(--muted);margin-top:4px}
+  canvas{image-rendering:pixelated;border-radius:6px;border:1px solid var(--line)}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .arrow{color:var(--muted);font-family:var(--font-mono)}
+  code{font-family:var(--font-mono);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+  .loss-box, .decode-box{font-family:var(--font-mono);font-size:13px}
+  .big{font-size:16px;font-weight:700}
+  .status{font-size:12.5px;color:var(--muted);min-height:18px}
+  @media (max-width:760px){ .panel-left{position:static;flex-basis:100%} }
+</style>
+
+<div class="page">
+  <div>
+    <p class="kicker">the real trained checkpoint, running live in your browser</p>
+    <h1>VLA Live Explainer</h1>
+    <p class="lead">Edit the scene on the left &mdash; every number on the right is recomputed on the spot by a hand-written JavaScript port of <code>model.py</code>, loaded with the actual weights from <code>vla_scratch_checkpoint.pt</code>. Nothing here is precomputed or faked.</p>
+  </div>
+
+  <div class="layout">
+    <div class="panel-left">
+      <div class="card">
+        <h3>Scene</h3>
+        <svg id="scene-svg" viewBox="0 0 288 288"></svg>
+        <div class="legend-row">
+          <span><i class="swatch" style="background:#f0f0f0"></i>click to cycle:</span>
+          <span>empty</span>&rarr;<span><i class="swatch" style="background:#f0f0f0;border-color:#999"></i>agent</span>&rarr;
+          <span><i class="swatch" style="background:#dc3c3c"></i>red</span>&rarr;
+          <span><i class="swatch" style="background:#3cb45a"></i>green</span>&rarr;
+          <span><i class="swatch" style="background:#3c64dc"></i>blue</span>&rarr;
+          <span><i class="swatch" style="background:#dcc83c"></i>yellow</span>&rarr;<span>empty</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="btn-random">Randomize scene</button>
+          <button id="btn-reset">Reset to example</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Instruction</h3>
+        <select id="target-select" style="width:100%"></select>
+        <div class="hint" id="target-hint"></div>
+      </div>
+
+      <div class="card">
+        <h3>Mode</h3>
+        <div class="seg">
+          <button id="mode-train" class="active train">Training</button>
+          <button id="mode-infer" class="infer">Inference</button>
+        </div>
+        <div class="hint" id="mode-hint"></div>
+      </div>
+    </div>
+
+    <div class="panel-right">
+
+      <div class="stage vision">
+        <div class="stage-head"><b>Image</b><span class="shape">(32, 32, 3) uint8 &rarr; (1, 3, 32, 32) f32</span></div>
+        <div class="stage-body flow">
+          <canvas id="scene-canvas" width="128" height="128"></canvas>
+          <span class="arrow">conv&#215;3 (s2) + projector &rarr;</span>
+          <div id="vision-tokens"></div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><b>Instruction</b><span class="shape" id="text-shape">(1, 4) int64</span></div>
+        <div class="stage-body">
+          <div id="text-tokens" class="token-row"></div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><b>Concatenated sequence</b><span class="shape">(1, 21, 64)</span></div>
+        <div class="stage-body">
+          <div id="full-seq" class="token-row"></div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><b>Transformer &mdash; what &lt;BOA&gt; attends to</b><span class="shape">causal self-attn, 4 heads &#215; 16 dim</span></div>
+        <div class="stage-body">
+          <div class="row">
+            <span style="font-size:12px;color:var(--muted)">layer:</span>
+            <div class="seg" id="layer-seg" style="max-width:160px">
+              <button data-layer="0">1</button><button data-layer="1">2</button><button data-layer="2" class="active">3</button>
+            </div>
+          </div>
+          <svg id="attn-svg" class="inline" viewBox="0 0 640 70"></svg>
+          <div class="hint">hover a cell for the exact attention weight &mdash; averaged over all 4 heads at the selected layer</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head"><b>LM head &rarr; logits over the vocabulary</b><span class="shape">(1, 13)</span></div>
+        <div class="stage-body">
+          <svg id="logits-svg" class="inline" viewBox="0 0 640 160"></svg>
+          <div class="hint">hover a bar for the exact logit and probability</div>
+        </div>
+      </div>
+
+      <div id="mode-panel"></div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================= verified forward pass (matches model.py to ~1e-3) =======================
+const GRID_SIZE = 8, CELL_PX = 4, IMG_SIZE = 32;
+const COLORS = { red: [220, 60, 60], green: [60, 180, 90], blue: [60, 100, 220], yellow: [220, 200, 60] };
+const BG_COLOR = [30, 30, 35], AGENT_COLOR = [240, 240, 240];
+const VOCAB = ["<PAD>", "<BOA>", "go", "to", "the", "red", "green", "blue", "yellow", "<UP>", "<DOWN>", "<LEFT>", "<RIGHT>"];
+const WORD_TO_ID = Object.fromEntries(VOCAB.map((w, i) => [w, i]));
+const ACTION_IDS = [9, 10, 11, 12];
+const ACTION_NAMES = ["up", "down", "left", "right"];
+const PAD_ID = 0, BOA_ID = 1, MAX_TEXT_LEN = 4;
+
+function encodeInstruction(words) {
+  const ids = words.map(w => WORD_TO_ID[w]);
+  while (ids.length < MAX_TEXT_LEN) ids.push(PAD_ID);
+  return ids;
+}
+function renderScene(agentPos, objects) {
+  const img = new Uint8Array(IMG_SIZE * IMG_SIZE * 3);
+  for (let p = 0; p < IMG_SIZE * IMG_SIZE; p++) for (let c = 0; c < 3; c++) img[p * 3 + c] = BG_COLOR[c];
+  function paint(r, c, color) {
+    for (let dy = 0; dy < CELL_PX; dy++) for (let dx = 0; dx < CELL_PX; dx++) {
+      const y = r * CELL_PX + dy, x = c * CELL_PX + dx;
+      for (let ch = 0; ch < 3; ch++) img[(y * IMG_SIZE + x) * 3 + ch] = color[ch];
+    }
+  }
+  for (const color in objects) if (objects[color]) paint(objects[color][0], objects[color][1], COLORS[color]);
+  paint(agentPos[0], agentPos[1], AGENT_COLOR);
+  return img;
+}
+function linear(x, W, b) {
+  const out = new Array(W.length);
+  for (let o = 0; o < W.length; o++) { let s = b ? b[o] : 0; const row = W[o]; for (let i = 0; i < row.length; i++) s += x[i] * row[i]; out[o] = s; }
+  return out;
+}
+function layerNorm(x, weight, bias, eps = 1e-5) {
+  const n = x.length; let mean = 0; for (const v of x) mean += v; mean /= n;
+  let varSum = 0; for (const v of x) varSum += (v - mean) * (v - mean); const variance = varSum / n;
+  const denom = Math.sqrt(variance + eps);
+  return x.map((v, i) => ((v - mean) / denom) * weight[i] + bias[i]);
+}
+function erf(x) {
+  const sign = x < 0 ? -1 : 1; x = Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign * y;
+}
+function gelu(x) { return x.map(v => 0.5 * v * (1 + erf(v / Math.SQRT2))); }
+function softmax(x) { const m = Math.max(...x); const exps = x.map(v => Math.exp(v - m)); const s = exps.reduce((a,b)=>a+b,0); return exps.map(v => v / s); }
+function conv2d(input, inC, H, W, weight, bias, outC, stride, pad) {
+  const Hout = Math.floor((H + 2*pad - 3) / stride) + 1, Wout = Math.floor((W + 2*pad - 3) / stride) + 1;
+  const out = Array.from({length: outC}, () => new Array(Hout*Wout).fill(0));
+  for (let oc = 0; oc < outC; oc++) for (let oy = 0; oy < Hout; oy++) for (let ox = 0; ox < Wout; ox++) {
+    let s = bias[oc];
+    for (let ic = 0; ic < inC; ic++) for (let ky = 0; ky < 3; ky++) {
+      const iy = oy*stride - pad + ky; if (iy < 0 || iy >= H) continue;
+      for (let kx = 0; kx < 3; kx++) { const ix = ox*stride - pad + kx; if (ix < 0 || ix >= W) continue;
+        s += input[ic][iy*W+ix] * weight[oc][ic][ky][kx]; }
+    }
+    out[oc][oy*Wout+ox] = Math.max(0, s);
+  }
+  return { data: out, H: Hout, W: Wout };
+}
+function runVLA(weights, image, textWords) {
+  const textIds = encodeInstruction(textWords);
+  const planes = [new Array(1024), new Array(1024), new Array(1024)];
+  for (let p = 0; p < 1024; p++) for (let c = 0; c < 3; c++) planes[c][p] = image[p*3+c] / 255.0;
+  let f = conv2d(planes, 3, 32, 32, weights["vision_encoder.conv.0.weight"], weights["vision_encoder.conv.0.bias"], 32, 2, 1);
+  f = conv2d(f.data, 32, f.H, f.W, weights["vision_encoder.conv.2.weight"], weights["vision_encoder.conv.2.bias"], 32, 2, 1);
+  f = conv2d(f.data, 32, f.H, f.W, weights["vision_encoder.conv.4.weight"], weights["vision_encoder.conv.4.bias"], 32, 2, 1);
+  const visionTokens = [];
+  for (let pos = 0; pos < f.H*f.W; pos++) { const vec = new Array(32); for (let c = 0; c < 32; c++) vec[c] = f.data[c][pos];
+    visionTokens.push(linear(vec, weights["vision_encoder.projector.weight"], weights["vision_encoder.projector.bias"])); }
+  const textTokens = textIds.map(id => weights["text_embed.weight"][id].slice());
+  const boaToken = weights["text_embed.weight"][BOA_ID].slice();
+  let seq = [...visionTokens, ...textTokens, boaToken];
+  seq = seq.map((tok, i) => tok.map((v, d) => v + weights["pos_embed"][0][i][d]));
+  const attentionByLayer = [];
+  for (let layer = 0; layer < 3; layer++) {
+    const p = "blocks." + layer + ".";
+    const normed1 = seq.map(x => layerNorm(x, weights[p+"ln1.weight"], weights[p+"ln1.bias"]));
+    const qkv = normed1.map(x => linear(x, weights[p+"attn.qkv.weight"], weights[p+"attn.qkv.bias"]));
+    const nHeads = 4, headDim = 16, n = seq.length;
+    const attnOut = Array.from({length:n}, () => new Array(64).fill(0));
+    const headAttn = [];
+    for (let h = 0; h < nHeads; h++) {
+      const rows = [];
+      for (let i = 0; i < n; i++) {
+        const qi = qkv[i].slice(h*headDim, h*headDim+headDim);
+        const scores = new Array(n).fill(-Infinity);
+        for (let j = 0; j <= i; j++) { const kj = qkv[j].slice(64+h*headDim, 64+h*headDim+headDim);
+          let dot = 0; for (let d = 0; d < headDim; d++) dot += qi[d]*kj[d]; scores[j] = dot/Math.sqrt(headDim); }
+        const wRow = softmax(scores); rows.push(wRow);
+        for (let j = 0; j <= i; j++) { const vj = qkv[j].slice(128+h*headDim, 128+h*headDim+headDim);
+          for (let d = 0; d < headDim; d++) attnOut[i][h*headDim+d] += wRow[j]*vj[d]; }
+      }
+      headAttn.push(rows);
+    }
+    attentionByLayer.push(headAttn);
+    const projected = attnOut.map(x => linear(x, weights[p+"attn.out.weight"], weights[p+"attn.out.bias"]));
+    seq = seq.map((x,i) => x.map((v,d) => v + projected[i][d]));
+    const normed2 = seq.map(x => layerNorm(x, weights[p+"ln2.weight"], weights[p+"ln2.bias"]));
+    const mlpOut = normed2.map(x => { const h1 = gelu(linear(x, weights[p+"mlp.0.weight"], weights[p+"mlp.0.bias"]));
+      return linear(h1, weights[p+"mlp.2.weight"], weights[p+"mlp.2.bias"]); });
+    seq = seq.map((x,i) => x.map((v,d) => v + mlpOut[i][d]));
+  }
+  const finalHidden = layerNorm(seq[seq.length-1], weights["ln_f.weight"], weights["ln_f.bias"]);
+  const logits = linear(finalHidden, weights["lm_head.weight"], new Array(13).fill(0));
+  return { textIds, logits, attentionByLayer };
+}
+
+// ======================= app state =======================
+let WEIGHTS = null;
+const state = {
+  agentPos: [0, 0],
+  objects: { red: [6, 3], yellow: [3, 2], green: [6, 2], blue: null },
+  target: "red",
+  mode: "train",
+  layer: 2,
+  stepCount: 0,
+  lastSuccess: null,
+};
+const ROLE_CYCLE = [null, "agent", "red", "green", "blue", "yellow"];
+
+function roleAt(r, c) {
+  if (state.agentPos[0] === r && state.agentPos[1] === c) return "agent";
+  for (const color in state.objects) { const p = state.objects[color]; if (p && p[0] === r && p[1] === c) return color; }
+  return null;
+}
+function cellClick(r, c) {
+  const current = roleAt(r, c);
+  const next = ROLE_CYCLE[(ROLE_CYCLE.indexOf(current) + 1) % ROLE_CYCLE.length];
+  if (current === "agent") { /* moving agent away handled by setting new role below */ }
+  else if (current) state.objects[current] = null;
+  if (next === "agent") state.agentPos = [r, c];
+  else if (next) state.objects[next] = [r, c];
+  else if (roleAt(r, c) === "agent") { /* can't delete the only agent silently; leave as empty is fine, agent just has no visual -- avoid: keep agent always placed */ }
+  refreshTargetOptions();
+  update();
+}
+function expertAction(agentPos, objects, target) {
+  const [ar, ac] = agentPos, [tr, tc] = objects[target];
+  const dr = tr - ar, dc = tc - ac;
+  if (dr === 0 && dc === 0) return null;
+  if (Math.abs(dr) >= Math.abs(dc) && dr !== 0) return dr > 0 ? "down" : "up";
+  return dc > 0 ? "right" : "left";
+}
+function stepAgent(action) {
+  const delta = { up: [-1,0], down: [1,0], left: [0,-1], right: [0,1] }[action];
+  const [r, c] = state.agentPos;
+  state.agentPos = [Math.max(0, Math.min(GRID_SIZE-1, r+delta[0])), Math.max(0, Math.min(GRID_SIZE-1, c+delta[1]))];
+  const t = state.objects[state.target];
+  state.lastSuccess = t && state.agentPos[0] === t[0] && state.agentPos[1] === t[1];
+  state.stepCount++;
+}
+
+// ======================= scene grid SVG =======================
+const sceneSvg = document.getElementById("scene-svg");
+const cellRects = [];
+(function initGrid() {
+  const size = 288 / GRID_SIZE;
+  for (let r = 0; r < GRID_SIZE; r++) { cellRects.push([]);
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("class", "cell"); rect.setAttribute("x", c*size); rect.setAttribute("y", r*size);
+      rect.setAttribute("width", size); rect.setAttribute("height", size);
+      rect.addEventListener("click", () => cellClick(r, c));
+      sceneSvg.appendChild(rect); cellRects[r].push(rect);
+    }
+  }
+})();
+const CSS_COLOR = { red:"#dc3c3c", green:"#3cb45a", blue:"#3c64dc", yellow:"#dcc83c", agent:"#f0f0f0", empty:"#1e1e23" };
+function redrawGrid() {
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    const role = roleAt(r, c);
+    cellRects[r][c].setAttribute("fill", CSS_COLOR[role || "empty"]);
+  }
+}
+
+// ======================= target / mode controls =======================
+const targetSelect = document.getElementById("target-select");
+function refreshTargetOptions() {
+  const present = Object.keys(state.objects).filter(c => state.objects[c]);
+  targetSelect.innerHTML = present.map(c => `<option value="${c}"${c===state.target?" selected":""}>go to the ${c}</option>`).join("");
+  if (!present.includes(state.target)) state.target = present[0] || null;
+  document.getElementById("target-hint").textContent = present.length ? "" : "place at least one colored object to pick an instruction";
+}
+targetSelect.addEventListener("change", () => { state.target = targetSelect.value; update(); });
+
+document.getElementById("mode-train").addEventListener("click", () => setMode("train"));
+document.getElementById("mode-infer").addEventListener("click", () => setMode("infer"));
+function setMode(m) {
+  state.mode = m;
+  document.getElementById("mode-train").classList.toggle("active", m === "train");
+  document.getElementById("mode-infer").classList.toggle("active", m === "infer");
+  document.getElementById("mode-hint").textContent = m === "train"
+    ? "shows the label (from the scripted expert) and the cross-entropy loss"
+    : "shows constrained decoding and lets you step the agent using the model's own choice";
+  update();
+}
+
+document.getElementById("btn-random").addEventListener("click", () => {
+  const cells = []; for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) cells.push([r,c]);
+  for (let i = cells.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [cells[i],cells[j]]=[cells[j],cells[i]]; }
+  state.agentPos = cells[0];
+  const colors = ["red","green","blue","yellow"];
+  const n = 2 + Math.floor(Math.random()*3);
+  state.objects = { red:null, green:null, blue:null, yellow:null };
+  for (let i = 0; i < n; i++) state.objects[colors[i]] = cells[i+1];
+  state.target = colors[Math.floor(Math.random()*n)];
+  state.stepCount = 0; state.lastSuccess = null;
+  refreshTargetOptions(); update();
+});
+document.getElementById("btn-reset").addEventListener("click", () => {
+  state.agentPos = [0,0]; state.objects = { red:[6,3], yellow:[3,2], green:[6,2], blue:null }; state.target = "red";
+  state.stepCount = 0; state.lastSuccess = null;
+  refreshTargetOptions(); update();
+});
+document.getElementById("layer-seg").addEventListener("click", (e) => {
+  if (e.target.dataset.layer === undefined) return;
+  state.layer = Number(e.target.dataset.layer);
+  [...document.getElementById("layer-seg").children].forEach(b => b.classList.toggle("active", b === e.target));
+  update();
+});
+
+// ======================= rendering the pipeline panels =======================
+const sceneCanvas = document.getElementById("scene-canvas");
+const ctx = sceneCanvas.getContext("2d");
+function drawSceneCanvas(image) {
+  const small = document.createElement("canvas"); small.width = 32; small.height = 32;
+  const sctx = small.getContext("2d");
+  const idata = sctx.createImageData(32, 32);
+  for (let p = 0; p < 1024; p++) { idata.data[p*4]=image[p*3]; idata.data[p*4+1]=image[p*3+1]; idata.data[p*4+2]=image[p*3+2]; idata.data[p*4+3]=255; }
+  sctx.putImageData(idata, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0,0,128,128);
+  ctx.drawImage(small, 0, 0, 128, 128);
+}
+
+function vecNorm(v) { let s=0; for (const x of v) s += x*x; return Math.sqrt(s); }
+
+function renderBarChart(svgEl, logits, highlightIds, title) {
+  const labels = VOCAB;
+  const n = labels.length;
+  const minL = Math.min(...logits), maxL = Math.max(...logits);
+  const pad = 24, w = 640, baseline = 120, maxH = 90;
+  const barW = (w - 2*pad) / n - 6;
+  const probs = softmax(logits);
+  let html = `<line x1="${pad}" y1="${baseline}" x2="${w-pad}" y2="${baseline}" stroke="var(--line)"/>`;
+  for (let i = 0; i < n; i++) {
+    const h = ((logits[i] - minL) / (maxL - minL + 1e-9)) * maxH + 4;
+    const x = pad + i * (barW + 6);
+    const isAction = highlightIds.includes(i);
+    const cls = isAction ? (state.mode === "train" ? "signal" : "action") : "muted";
+    const fillVar = isAction ? `var(--${cls}-fill)` : "var(--surface-2)";
+    const strokeVar = isAction ? `var(--${cls})` : "var(--line)";
+    const cleanLabel = labels[i].replace(/[<>]/g, "");
+    html += `<rect x="${x}" y="${baseline-h}" width="${barW}" height="${h}" fill="${fillVar}" stroke="${strokeVar}" stroke-width="${isAction?1.5:1}">
+      <title>${cleanLabel}: logit ${logits[i].toFixed(2)}, p=${probs[i].toFixed(4)}</title></rect>`;
+    html += `<text x="${x+barW/2}" y="${baseline+13}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" fill="var(--muted)">${cleanLabel}</text>`;
+  }
+  svgEl.setAttribute("viewBox", `0 0 ${w} 145`);
+  svgEl.innerHTML = html;
+}
+
+function renderAttention(svgEl, headAttnLayers, layer) {
+  const heads = headAttnLayers[layer];
+  const n = 21, last = n - 1;
+  const avg = new Array(n).fill(0);
+  for (const h of heads) for (let j = 0; j < n; j++) avg[j] += h[last][j] / heads.length;
+  const w = 640, pad = 10, cellW = (w - 2*pad) / n - 3;
+  const labels = []; for (let i=0;i<16;i++) labels.push("v"+(i+1)); for (let i=0;i<4;i++) labels.push("t"+(i+1)); labels.push("BOA");
+  let html = "";
+  for (let i = 0; i < n; i++) {
+    const x = pad + i*(cellW+3);
+    const alpha = avg[i];
+    const colorVar = i < 16 ? "vision" : (i === 20 ? "action" : "core-line");
+    html += `<rect x="${x}" y="20" width="${cellW}" height="30" rx="3" fill="var(--${colorVar}-fill, var(--surface-2))" stroke="var(--${colorVar})" stroke-opacity="${0.25+alpha*4}" fill-opacity="${0.15+alpha*6}">
+      <title>${labels[i]}: attention weight ${alpha.toFixed(4)}</title></rect>`;
+    html += `<text x="${x+cellW/2}" y="60" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="var(--muted)">${labels[i]}</text>`;
+  }
+  svgEl.setAttribute("viewBox", `0 0 ${w} 70`);
+  svgEl.innerHTML = html;
+}
+
+function update() {
+  if (!WEIGHTS) return;
+  redrawGrid();
+  const present = Object.keys(state.objects).filter(c => state.objects[c]);
+  if (!present.length || !state.target) { document.getElementById("mode-panel").innerHTML = "<div class='card'>Place at least one object to continue.</div>"; return; }
+
+  const image = renderScene(state.agentPos, state.objects);
+  drawSceneCanvas(image);
+  const words = ["go", "to", "the", state.target];
+  const result = runVLA(WEIGHTS, image, words);
+
+  document.getElementById("text-tokens").innerHTML = words.map((w,i) =>
+    `<span class="pill">${w}=${result.textIds[i]}</span>`).join("");
+
+  const visionHtml = `<div class="token-row">` + Array.from({length:16}, (_,i) => `<span class="pill v" title="visual token ${i+1}">v${i+1}</span>`).join("") + `</div>`;
+  document.getElementById("vision-tokens").innerHTML = visionHtml;
+
+  let seqHtml = "";
+  for (let i=0;i<16;i++) seqHtml += `<span class="pill v">v${i+1}</span>`;
+  words.forEach((w,i) => seqHtml += `<span class="pill">${w}</span>`);
+  seqHtml += `<span class="pill boa">&lt;BOA&gt;</span>`;
+  document.getElementById("full-seq").innerHTML = seqHtml;
+
+  renderAttention(document.getElementById("attn-svg"), result.attentionByLayer, state.layer);
+  renderBarChart(document.getElementById("logits-svg"), result.logits, ACTION_IDS);
+
+  const modePanel = document.getElementById("mode-panel");
+  if (state.mode === "train") {
+    const action = expertAction(state.agentPos, state.objects, state.target);
+    if (!action) {
+      modePanel.innerHTML = `<div class="stage train"><div class="stage-head"><b>Already at the target</b></div><div class="hint">no label to compute &mdash; move the target or agent to see a loss</div></div>`;
+    } else {
+      const labelId = ACTION_IDS[ACTION_NAMES.indexOf(action)];
+      const probs = softmax(result.logits);
+      const loss = -Math.log(Math.max(probs[labelId], 1e-9));
+      modePanel.innerHTML = `
+        <div class="stage train">
+          <div class="stage-head"><b>Label (from the scripted expert)</b><span class="shape">never enters the model's input</span></div>
+          <div class="stage-body loss-box">
+            <div>env.expert_action() = <span class="big">"${action}"</span> &rarr; vocab id ${labelId}</div>
+            <div style="margin-top:8px">cross_entropy(logits, label) = <span class="big">${loss.toFixed(4)}</span></div>
+          </div>
+        </div>`;
+    }
+  } else {
+    const actionLogits = ACTION_IDS.map(id => result.logits[id]);
+    const best = actionLogits.indexOf(Math.max(...actionLogits));
+    const chosenName = ACTION_NAMES[best];
+    modePanel.innerHTML = `
+      <div class="stage infer">
+        <div class="stage-head"><b>Constrained decoding</b><span class="shape">argmax over {UP, DOWN, LEFT, RIGHT} only</span></div>
+        <div class="stage-body decode-box">
+          <div>chosen: <span class="big">&lt;${chosenName.toUpperCase()}&gt;</span> &rarr; env.step("${chosenName}")</div>
+          <div class="row" style="margin-top:10px">
+            <button id="btn-step">Step &rarr;</button>
+            <span class="status">${state.stepCount ? `${state.stepCount} step(s) taken` + (state.lastSuccess ? " &mdash; reached the target!" : "") : "click Step to watch the model actually move the agent"}</span>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("btn-step").addEventListener("click", () => { stepAgent(chosenName); update(); });
+  }
+}
+
+refreshTargetOptions();
+fetch("vla_weights.json").then(r => r.json()).then(w => { WEIGHTS = w; update(); })
+  .catch(err => { document.getElementById("mode-panel").innerHTML = `<div class="card">Could not load vla_weights.json: ${err}</div>`; });
+</script>

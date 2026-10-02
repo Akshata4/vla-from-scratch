@@ -1,12 +1,12 @@
 import torch
 import torch.nn.functional as F
+from model import VLA
 from torch.utils.data import DataLoader, TensorDataset
 
-from data import generate_dataset
-from model import VLA
-from tokenizer import ACTION_IDS, BOA_ID, MAX_TEXT_LEN, VOCAB_SIZE
+from .data import generate_dataset
+from .tokenizer import ACTION_IDS, BOA_ID, MAX_TEXT_LEN, VOCAB_SIZE
 
-CHECKPOINT_PATH = "checkpoint.pt"
+CHECKPOINT_PATH = "babyai_checkpoint.pt"
 
 
 def build_model():
