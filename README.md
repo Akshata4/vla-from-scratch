@@ -132,6 +132,22 @@ Switching to `RGBImgPartialObsWrapper` (an egocentric view — the agent only se
 
 **Result: 68.5% closed-loop success on plain behavior cloning** — notably *higher* than the discrete version's 54% on the same task, same data, same training budget. One plausible reason (one run, not statistically rigorous): regressing toward 4 well-separated unit vectors via MSE may simply be an easier optimization target than classifying over a 13-token vocabulary where most of the softmax mass has to be actively suppressed on irrelevant word/pad tokens. Worth keeping in mind: this doesn't make continuous heads universally better — which family wins is genuinely task-dependent in real systems too, which is why both families still coexist in production VLAs.
 
+### Discrete vs. continuous, side by side
+
+| | Discrete action tokens (`grid_world`) | Continuous action head (`continuous_action`) |
+|---|---|---|
+| Output head | softmax over vocab, weight-tied to the text embedding | `Linear(64, 2)` regression, no vocabulary entry for actions |
+| Loss | cross-entropy vs. an action-token id | MSE vs. a continuous target vector |
+| Best fit when | building on a pretrained LLM/VLM — reuses its existing vocabulary + decoding machinery for free | training from scratch, or when there's no pretrained backbone's infrastructure to leverage |
+| Multi-dimensional actions | natural fit — decode one token per dimension autoregressively, each conditioned on the ones already chosen | one shot, all dimensions at once — faster, but can't explicitly condition later dims on earlier ones the way autoregression does |
+| Precision | capped by bin resolution (e.g. 256 bins across a range) | arbitrary precision, no quantization ceiling |
+| Control smoothness | can jump bin to bin | naturally smooth |
+| Multiple valid solutions from one state | handles this well — it's just another class in the softmax | plain MSE collapses toward the *average* of the valid modes, which can be invalid for either — real systems use diffusion/flow-matching instead of plain MSE to fix this |
+| Real examples | RT-2, OpenVLA | RT-1, ACT, Diffusion Policy, π0 |
+| Measured here (plain BC, this task) | 54% closed-loop success | **68.5%** closed-loop success |
+
+Our task has no real multimodality (the tie-break rule makes the correct direction unambiguous at every state), which is likely a big part of why plain MSE did so well — a task with genuinely multiple right answers would probably flip this result.
+
 ## Live explainer
 
 `docs/vla-explainer.html` is an interactive, in-browser version of the `grid_world` model, inspired by [Transformer Explainer](https://poloclub.github.io/transformer-explainer/). `export_weights.py` dumps every parameter of the trained `grid_world` checkpoint to `docs/vla_weights.json` (174,592 numbers), and the page's own hand-written JavaScript forward pass — conv layers, causal self-attention, layer norm, the weight-tied head, all reimplemented from scratch — loads that JSON and recomputes the real model on every click. No video, no precomputed frames: click a grid cell to move the agent or an object, pick the instruction, and the vision tokens, attention weights, and logits all update live. Toggle Training mode to see the scripted expert's label and the real cross-entropy loss; toggle Inference mode to see constrained decoding and step the agent using the model's own choice.
