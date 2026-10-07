@@ -104,7 +104,7 @@ A natural next experiment on this codebase: implement one round of DAgger — ru
 Everything here is sized to be understood, not to be state of the art:
 
 - **Toy grid world instead of a physics simulator** — full control over every pixel, no simulator install, fast iteration on CPU.
-- **Discretized single-token actions instead of continuous control** — matches the RT-2/OpenVLA "extend the vocabulary" mechanism directly; a real robot with continuous joint angles would need either this repo's approach applied per-dimension (multiple action tokens, decoded autoregressively) or a continuous regression/diffusion head instead.
+- **Discretized single-token actions instead of continuous control** — matches the RT-2/OpenVLA "extend the vocabulary" mechanism directly; a real robot with continuous joint angles would need either this repo's approach applied per-dimension (multiple action tokens, decoded autoregressively) or a continuous regression/diffusion head instead (see `continuous_action/` below for the regression version, built side by side with this one for direct comparison).
 - **A small CNN trained from scratch instead of a pretrained ViT/DINOv2/SigLIP** — the images here are simple synthetic scenes, so a few conv layers are enough; real VLAs use large pretrained vision backbones because real camera images need it.
 - **A ~3-layer, ~64-dim transformer instead of a pretrained LLM** — trained entirely from scratch on synthetic data in minutes, so every weight in the model was shaped only by what's in this repo, with nothing borrowed from a pretrained checkpoint.
 
@@ -121,6 +121,16 @@ The toy grid world above is entirely hand-rolled — our own renderer, our own s
 Switching to `RGBImgPartialObsWrapper` (an egocentric view — the agent only sees what's directly in front of it, not the whole room) fixed almost all of it: **75.8% single-step accuracy, 53% closed-loop success** — back in line with the original toy, despite the task now being genuinely partially observable (the target is often off-screen entirely, and the model has no memory across frames — one image in, one action out). The expected failure mode of partial observability — identical "empty wall ahead" frames needing different actions depending on an off-screen target's unseen location — turned out not to dominate in practice. The lesson: an egocentric view turns "which way do I turn" into something close to directly readable from the image (object visible and off-center → turn toward it; object centered → go forward), whereas the top-down view demanded an extra, harder, rotation-dependent inference step. Matching the camera convention to the action convention mattered more than resolution, dataset size, or anything else adjusted here.
 
 (`BabyAIBot`, the label source, always plans from the environment's full internal grid state regardless of which wrapper the learner's image comes from — it's a privileged-information demonstrator, same role our own `env.expert_action()` played, not something the trained model has access to.)
+
+## Extension: a continuous action head
+
+`grid_world`'s action head is the discrete, RT-2-style family: extend the vocabulary with action tokens, classify among them with softmax + cross-entropy. The other major family real VLAs use is continuous: regress an action vector directly (RT-1, ACT, Diffusion Policy, π0). `continuous_action/` implements that second family on the exact same task, reusing `model.py`'s `VisionEncoder` and `TransformerBlock` unchanged and importing `grid_world`'s `GridWorld` environment unchanged — only the output head and loss differ:
+
+- `continuous_action/model.py`'s `VLAContinuous` ends in `nn.Linear(64, 2)` instead of a vocab-sized, weight-tied classification head — the model outputs a raw `(dx, dy)` vector, not a probability distribution over tokens
+- `continuous_action/tokenizer.py` has **no action tokens at all** — `ACTION_VECTOR` maps each named action to the continuous target it should regress toward (matching `env.py`'s own `ACTION_DELTA`), and `vector_to_action()` snaps a prediction back to one of the 4 grid moves so it can still be executed in our discrete-grid environment
+- `continuous_action/train.py` uses `F.mse_loss` in place of `F.cross_entropy` — there's no "did it pick the right class" accuracy metric anymore, only how close the predicted vector lands to the target
+
+**Result: 68.5% closed-loop success on plain behavior cloning** — notably *higher* than the discrete version's 54% on the same task, same data, same training budget. One plausible reason (one run, not statistically rigorous): regressing toward 4 well-separated unit vectors via MSE may simply be an easier optimization target than classifying over a 13-token vocabulary where most of the softmax mass has to be actively suppressed on irrelevant word/pad tokens. Worth keeping in mind: this doesn't make continuous heads universally better — which family wins is genuinely task-dependent in real systems too, which is why both families still coexist in production VLAs.
 
 ## Live explainer
 
