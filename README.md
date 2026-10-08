@@ -148,6 +148,24 @@ Switching to `RGBImgPartialObsWrapper` (an egocentric view — the agent only se
 
 Our task has no real multimodality (the tie-break rule makes the correct direction unambiguous at every state), which is likely a big part of why plain MSE did so well — a task with genuinely multiple right answers would probably flip this result.
 
+## Extension: a pretrained vision encoder
+
+`grid_world`'s `VisionEncoder` is a 3-layer CNN trained from scratch on nothing but our own 3000 toy episodes. Real VLAs instead typically use a vision backbone pretrained on millions of real photographs (DINOv2, SigLIP, CLIP) and keep it frozen, or nearly so. `pretrained_vision/` swaps in **DINOv2-Small** (`facebook/dinov2-small`, 22M params, self-supervised pretraining on ~142M images) for exactly that comparison, reusing `model.py`'s `TransformerBlock` and `grid_world`'s tokenizer/action representation unchanged — only the vision path differs:
+
+- `pretrained_vision/vision_backbone.py` — loads DINOv2-Small frozen (`requires_grad=False`, never trained), resizes our 32×32 renders to 56×56 so DINOv2's 14×14 patches tile into exactly 16 tokens (matching the original CNN's token count), applies the ImageNet normalization DINOv2 expects, and returns its patch-token grid (dropping the CLS token, since the task needs spatial position, not a single pooled summary)
+- `pretrained_vision/data.py` — runs every training image through the frozen backbone **once**, up front, and caches the resulting features — since the backbone never changes, there's no reason to recompute it every epoch, which is what keeps training exactly as fast as every other variant in this repo
+- `pretrained_vision/model.py`'s `VLAPretrainedVision` has no vision-encoder module at all — it starts from the pre-extracted `(16, 384)` features and only trains a projector + transformer + head (176,896 trainable params, vs. DINOv2's 22M frozen ones)
+
+**Result: 90.3% single-step accuracy, 87.5% closed-loop success on plain behavior cloning** — no DAgger involved. For comparison, it took 4 rounds of DAgger to get the from-scratch CNN from 54% up to 96%; pretrained features alone got most of the way there in a single plain-BC run:
+
+| Variant | Plain BC closed-loop success | After DAgger |
+|---|---|---|
+| From-scratch CNN (`grid_world`) | 54% | 96% |
+| Continuous action head (`continuous_action`) | 68.5% | not tried |
+| **Frozen DINOv2 (`pretrained_vision`)** | **87.5%** | not tried |
+
+Honest caveat: this is one run, not statistically rigorous, and it's plausible DINOv2's features are just robustly good at low-level structure (color/shape boundaries) even on a flat synthetic domain it never saw during pretraining — not necessarily proof that pretrained vision is "better" in general, just a strong result on this task.
+
 ## Live explainer
 
 `docs/vla-explainer.html` is an interactive, in-browser version of the `grid_world` model, inspired by [Transformer Explainer](https://poloclub.github.io/transformer-explainer/). `export_weights.py` dumps every parameter of the trained `grid_world` checkpoint to `docs/vla_weights.json` (174,592 numbers), and the page's own hand-written JavaScript forward pass — conv layers, causal self-attention, layer norm, the weight-tied head, all reimplemented from scratch — loads that JSON and recomputes the real model on every click. No video, no precomputed frames: click a grid cell to move the agent or an object, pick the instruction, and the vision tokens, attention weights, and logits all update live. Toggle Training mode to see the scripted expert's label and the real cross-entropy loss; toggle Inference mode to see constrained decoding and step the agent using the model's own choice.
